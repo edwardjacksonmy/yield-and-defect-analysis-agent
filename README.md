@@ -139,7 +139,7 @@ The system recognizes the 9 standard defect pattern types from the WM-811K taxon
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/<your-username>/yield-defect-analysis-agent.git
+git clone https://github.com/edwardjackson_my/yield-defect-analysis-agent.git
 cd yield-defect-analysis-agent
 ```
 
