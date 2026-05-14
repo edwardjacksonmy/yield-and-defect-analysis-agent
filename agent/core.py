@@ -17,11 +17,13 @@ from agent.tools.historical_query import historical_query_tool
 from agent.tools.wafer_visualizer import wafer_visualizer_tool
 from agent.tools.report_generator import report_generator_tool
 from agent.tools.root_cause import root_cause_tool
+from agent.tools.pattern_classifier import pattern_classifier_tool
 
 load_dotenv()
 
 ALL_TOOLS = [
     data_ingestion_tool,
+    pattern_classifier_tool,
     yield_calculator_tool,
     defect_analyzer_tool,
     spatial_clustering_tool,
@@ -39,6 +41,8 @@ You have access to the following tools:
 
 TOOL USAGE GUIDELINES:
 - When the user message contains a file path: call data_ingestion_tool FIRST with that exact path.
+- If data_ingestion_tool reports "Defect codes: not provided", call pattern_classifier_tool IMMEDIATELY after ingestion — before any defect or root cause analysis. This predicts the WM-811K defect pattern for each wafer from spatial die data.
+- If the user asks to "classify patterns", "predict defect type", or "what pattern is this", call pattern_classifier_tool.
 - For ALL other analysis queries (yield, defects, clustering, root cause), call the relevant tool(s) DIRECTLY — they read from the already-loaded session data. Do NOT ask for a file path; just invoke the tool. If the tool returns "No batch loaded", then inform the user a file must be uploaded.
 - For yield queries: call yield_calculator_tool with input "current".
 - For defect analysis: call defect_analyzer_tool AND spatial_clustering_tool together.
