@@ -9,7 +9,8 @@ import streamlit as st
 from sqlalchemy import create_engine, text
 from langchain_core.tools import tool
 
-REQUIRED_COLUMNS = ["lot_id", "wafer_id", "die_x", "die_y", "pass_fail", "defect_code"]
+REQUIRED_COLUMNS = ["lot_id", "wafer_id", "die_x", "die_y", "pass_fail"]
+OPTIONAL_COLUMNS = ["defect_code"]
 
 WM811K_DEFECT_LABELS = {
     "Center", "Donut", "Edge-Loc", "Edge-Ring",
@@ -63,7 +64,11 @@ def data_ingestion_tool(file_path: str) -> str:
         # Column validation
         missing_cols = [c for c in REQUIRED_COLUMNS if c not in df.columns]
         if missing_cols:
-            return f"ERROR: Missing required columns: {missing_cols}. Required: {REQUIRED_COLUMNS}"
+            return (
+                f"ERROR: Missing required columns: {missing_cols}. "
+                f"Required: {REQUIRED_COLUMNS}. "
+                f"Optional (auto-predicted if absent): {OPTIONAL_COLUMNS}"
+            )
 
         # Type coercion
         df["die_x"] = pd.to_numeric(df["die_x"], errors="coerce")
@@ -72,8 +77,13 @@ def data_ingestion_tool(file_path: str) -> str:
         df = df.dropna(subset=["die_x", "die_y", "pass_fail"])
         df["pass_fail"] = df["pass_fail"].astype(int)
 
-        # Normalise defect codes
-        df["defect_code"] = df["defect_code"].fillna("none").astype(str)
+        # defect_code is optional — set to "unknown" when absent so the
+        # pattern_classifier_tool can fill it in via ML prediction.
+        has_defect_col = "defect_code" in df.columns
+        if has_defect_col:
+            df["defect_code"] = df["defect_code"].fillna("none").astype(str)
+        else:
+            df["defect_code"] = "unknown"
 
         # Stats
         total = len(df)
@@ -92,6 +102,12 @@ def data_ingestion_tool(file_path: str) -> str:
         # Persist to DB so the data can be restored in future sessions
         _save_to_db(df, yield_rate, passed, failed, total)
 
+        defect_status = (
+            f"Defect types  : {defect_types}"
+            if has_defect_col
+            else "Defect codes  : not provided — run pattern_classifier_tool to predict from spatial data"
+        )
+
         summary = f"""Data ingestion successful ✅
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Total dies    : {total:,}
@@ -100,9 +116,9 @@ Failed dies   : {failed:,}
 Yield rate    : {yield_rate:.2f}%
 Wafer count   : {wafers}
 Lot count     : {lots}
-Defect types  : {defect_types}"""
+{defect_status}"""
 
-        if unknown:
+        if has_defect_col and unknown:
             summary += f"\n⚠ Non-standard defect labels detected: {unknown}"
 
         return summary
